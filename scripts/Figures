@@ -1,3 +1,80 @@
+## Figure 1 
+
+# Load libraries
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(viridis)
+
+## Read data
+gisaid_metadata <- read.csv2(file = "data/ba3_all/ba.3.x/gisaid_auspice_input_hcov-19_2025_07_23_14/1753280730234.metadata.tsv", sep = "\t")
+nextclade_metadata <- read.csv2(file = "data/ba3_all/ba.3.x/nextclade_results/nextclade.tsv", sep = "\t")
+
+combined_metadata <- inner_join(gisaid_metadata, nextclade_metadata, join_by(strain == seqName), keep = TRUE) %>%
+  mutate(date = as.Date(date))
+
+
+## Prepare data for plotting
+# Group by week start and lineage
+weekly_counts <- combined_metadata %>%
+  mutate(week_start = floor_date(date, unit = "week")) %>%
+  group_by(week_start, Nextclade_pango) %>%
+  summarise(count = n(), .groups = "drop")
+
+# Simple stacked bar plot
+ggplot(weekly_counts, aes(x = week_start, y = count, fill = Nextclade_pango)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Number of sequences per week by Pango lineage",
+    x = "Week start date",
+    y = "Number of sequences",
+    fill = "Pango lineage"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# Publication-quality stacked bar plot
+p <- ggplot(weekly_counts, aes(x = week_start, y = count, fill = Nextclade_pango)) +
+      geom_bar(stat = "identity", width = 6) +
+      scale_fill_viridis_d(option = "plasma", end = 0.95) +
+      scale_x_date(
+        date_labels = "%b %Y",
+        breaks = seq(as.Date("2022-01-01"), max(weekly_counts$week_start), by = "12 months"),
+        expand = c(0.05, 0)
+      ) +
+      labs(
+#       title = "Number of SARS-CoV-2 sequences per week by Pango lineage",
+        x = NULL,
+        y = "Number of sequences",
+        fill = "Pango lineage"
+      ) +
+      theme_minimal(base_size = 14) +
+      theme(
+        plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+#       axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        panel.grid = element_blank(), # remove grids
+        axis.line = element_line(colour = "grey30", linewidth = 0.2), # keep axis lines
+        axis.ticks = element_line(colour = "grey30", linewidth = 0.2),# keep tick marks
+        legend.position = "bottom",
+        legend.title = element_text(face = "bold"),
+        legend.key.size = unit(0.5, "cm")
+      )
+
+plot(p)
+
+# Export as PNG (high resolution)
+ggsave("outputs/ba3x_sequence_distribution.png", plot = p,
+       width = 10, height = 5, units = "in", dpi = 300)
+
+# Export as PDF
+ggsave("outputs/ba3x_sequence_distribution.pdf", plot = p,
+       width = 10, height = 5, units = "in", dpi = 300)
+
+
+
+
 library("readxl")
 library(ggplot2)
 library(dplyr)
